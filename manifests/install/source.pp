@@ -1,11 +1,10 @@
-# Install zenoss core from source
+# Install zenoss core from source repository
+# The build process is fairly complex so, this could become a non option due to the support nightmare :)
 
 class zenoss::install::source(
 	$install_dir = "/usr/local/zenoss", 
 	$source_repo = "http://dev.zenoss.org/svn/branches/zenoss-3.0.x/inst"
 ) {
-
-
 	
 	package { "gcc":
 		ensure => installed,
