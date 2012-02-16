@@ -29,11 +29,12 @@ Puppet::Type.newtype(:zenoss_device) do
 	newparam(:device_class) do
 		desc "The device class
 		
-		The root class is /zport/dmd/Devices, which is also the default.
+		The default class is /Server
 		"
 		
-		defaultto "/zport/dmd/Devices"
+		defaultto "/Server"
 		#TODO: loose validation
+		#TODO: default via operatingsystem
 	end
 	
 	newparam(:title) do
@@ -54,10 +55,8 @@ Puppet::Type.newtype(:zenoss_device) do
     end
 	end
 	
-	newparam(:path) do
+	newparam(:location_path) do
 		desc "Organizer path of the location for this device"
-		
-		# TODO: validate against a cached list of paths maybe?
 	end
 	
 	newparam(:system_paths) do
@@ -88,12 +87,7 @@ Puppet::Type.newtype(:zenoss_device) do
 	newparam(:production_state) do
 		desc "The zenoss production state"
 		
-		# TODO: the API deals with integer values, but we want to use a string identifier
-		# find some kind of lookup API?
-		# This can be set from the web ui, provide a reasonable default with a way of overriding those values
-		
 		# States that are supplied out of the box with zenoss
-		# Provides a convenient way to supply the parameter via symbol.
 		DEFAULT_STATES = {
 		  :production     => 1000,
 		  :pre_production => 500,
@@ -112,14 +106,19 @@ Puppet::Type.newtype(:zenoss_device) do
 	
 	newparam(:comments) do
 	  desc "Comments on this device"
+	  defaultto "This entry is managed by puppet. changes may be overridden."
 	end
 	
 	newparam(:hw_manufacturer) do
 	  desc "Hardware manufacturer name"
+	  
+	  defaultto Facter['manufacturer'].value
 	end
 	
 	newparam(:hw_product_name) do
 	  desc "Hardware product name"
+	  
+	  defaultto Facter['productname'].value  
 	end
 	
 	newparam(:os_manufacturer) do
@@ -128,14 +127,23 @@ Puppet::Type.newtype(:zenoss_device) do
 	
 	newparam(:os_product_name) do
 	  desc "OS product name"
+	  
+	  defaultto {
+	    case Facter['operatingsystem'].value
+      when 'Debian'
+        Facter['lsbdistdescription'].value
+      when 'Darwin'
+        Facter['sp_os_version'].value
+      else
+        ''
+	    end
+	  }
 	end
 	
 	newparam(:priority) do
 		desc "Priority"
 		
 		# These priorities are supplied out of the box with Zenoss
-		# The symbols provide a convenient method of specifying a device priority,
-		# without preventing a user from defining their own priority numbers.
 		DEFAULT_PRIORITIES = {
 		  :highest => 5,
 		  :high    => 4,
@@ -159,6 +167,15 @@ Puppet::Type.newtype(:zenoss_device) do
 	
 	newparam(:serial_number) do
 	  desc "Serial number of this device"
+	  
+	  defaultto {
+	    case Facter['operatingsystem'].value
+	    when 'Darwin'
+	      Facter['sp_serial_number'].value
+	    else
+	      nil
+	    end
+	  }
 	end
 	
 	# Zenoss Monitor/Collector Details, TODO: find a better place for these

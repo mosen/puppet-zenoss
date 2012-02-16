@@ -28,6 +28,9 @@ Puppet::Type.type(:zenoss_device).provide :zenoss_device_jsonrpc, :parent => Pup
     "ZenPackRouter"   => "zenpack"
   }
   
+  DEVICECLASS_PREFIX = "/zport/dmd/Devices" # Some API requires this prefix for deviceClass
+  
+  # TODO: how can we grab instances without the zenoss config being external to the type definition?
   # def self.instances
   #   puts 'grabbing instances'
   #   devices = self.get_devices
@@ -36,41 +39,75 @@ Puppet::Type.type(:zenoss_device).provide :zenoss_device_jsonrpc, :parent => Pup
   # 
   # def self.prefetch(resources)
   #   puts 'prefetching devices'
+  #   
+  #   resources.each do |name, device|
+  #     puts name
+  #     puts device.title
+  #   end
   # end
   
   def create
     self.login if !@cookie
     
-    result = add_device({
-      "deviceName"  => resource[:name],
-      "deviceClass" => resource[:device_class],
-      "title"       => resource[:title],
-      "priority"    => resource[:priority],
-      "productionState" => resource[:production_state]
-    })
+    device_properties = {
+      "deviceName"      => resource[:name],
+      "deviceClass"     => resource[:device_class],
+      "title"           => resource[:title],
+      "snmpCommunity"   => resource[:snmp_community],
+      "snmpPort"        => resource[:snmp_port],
+      "locationPath"    => resource[:location_path],
+      "systemPaths"     => resource[:system_paths],
+      "groupPaths"      => resource[:group_paths],
+      "model"           => resource[:model],
+      "collector"       => resource[:collector],
+      "rackSlot"        => resource[:rack_slot],
+      "productionState" => resource[:production_state],
+      "comments"        => resource[:comments],
+      "hwManufacturer"  => resource[:hw_manufacturer],
+      "hwProductName"   => resource[:hw_product_name],
+      "osManufacturer"  => resource[:os_manufacturer],
+      "osProductName"   => resource[:os_product_name],
+      "priority"        => resource[:priority],
+      "tag"             => resource[:tag],
+      "serialNumber"    => resource[:serial_number]
+    }
+    
+    device_properties.delete_if {|k, v| v.nil? }
+    
+    result = add_device(device_properties)
     
     raise Puppet::Error, "There was an error adding a device to zenoss..." if !result["success"]
     
-    Puppet.debug "Zenoss device created with jobId #{result['jobId']}"
+    Puppet.debug "Zenoss device created with jobId #{result['jobId']}, check jobs page for status"
   end
   
   def destroy
-    # self.login if !@cookie
+    self.login if !@cookie
     
     # TODO: prefetch devices, populate resources with UID prior to destroy being run.
-    # devices = get_devices(resource[:class])
-    # device_names = devices.map {|d| d["name"] }
-    # current_device = device_names[resource[:name]]
-    # 
-    # result = remove_devices([current_device["uid"]])
+    devices = get_devices(resource[:device_class])
+    result = nil
+    
+    devices.each do |d|
+      if d["name"] == resource[:name] || d["name"] == resource[:title]
+        result = remove_devices([d["uid"]])
+      end
+    end
+    
+    device_names = devices.map {|d| d["name"] }
+    
+    raise Puppet::Error, "Zenoss attempted to delete a device that wasnt listed." if result.nil?
+      
+    result
   end
   
   def exists?
     self.login if !@cookie
     devices = get_devices(resource[:device_class])
     device_names = devices.map {|d| d["name"] }
+    #device_titles = devices.map{|d| d["title"] }
     
-    device_names.include? resource[:name]
+    device_names.include?(resource[:name]) || device_names.include?(resource[:title])
   end
   
   # Initialize the API connection, log in, and store authentication cookie
@@ -140,18 +177,18 @@ Puppet::Type.type(:zenoss_device).provide :zenoss_device_jsonrpc, :parent => Pup
     response = Net::HTTP.new(self.host, self.port).start {|http| http.request(req) }
 
     begin
-      response_obj = JSON.parse(response.body)
-      response_obj
+      JSON.parse(response.body)
     rescue
       Puppet.debug response.body # TODO: attempt parse of response to glean error message
       raise Puppet::Error, "Zenoss rejected one of our requests, please check the zenoss host details to ensure they are correct."
     end
   end
   
-  def get_devices(device_class = '/zport/dmd/Devices')
+  def get_devices(device_class='')
+    device_class = DEVICECLASS_PREFIX + device_class 
     response = _router_request("DeviceRouter", "getDevices", [{
       "uid"    => device_class,
-      "params" => {}
+      "params" => {} # TODO: support full API getDevices with filter parameters.
     }])
     
     # Used to detect whether devices have changed between requests, prevents changes happening if
@@ -170,13 +207,17 @@ Puppet::Type.type(:zenoss_device).provide :zenoss_device_jsonrpc, :parent => Pup
   # Remove device(s) by uids
   # TODO: maybe support full parameters list of this function, but most of it falls outside puppet scope.
   def remove_devices(uids, action="delete")
+    Puppet.debug "Zenoss removing devices with UIDs: " + uids.join(',')
+    
     response = _router_request("DeviceRouter", "removeDevices", [{
       "uids"         => uids,
       "hashcheck"    => @hashcheck,
-      "action"       => action,
-      "deleteEvents" => true, # TODO: make configurable
-      "deletePerf"   => true
+      "action"       => action
+      # "deleteEvents" => true, # TODO: make configurable
+      # "deletePerf"   => true
     }])
+    
+    raise Puppet::Error, "Zenoss cannot delete the device, " + response["message"] if response["type"] == "exception"
     
     response["result"]
   end
