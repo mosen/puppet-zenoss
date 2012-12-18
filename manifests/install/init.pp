@@ -1,17 +1,12 @@
-# Install Zenoss core stack or from source
+# Install Zenoss Core 4.2.x
+# In a lot of cases you might want to do your own tweaking and add or omit certain packages.
+# This installer should get a system up and running though.
 
-class zenoss::install (
-	$install_source_only = false # Only install from source, even if packages are available.
-) {
-	if $install_source_only {
-		include zenoss::install::source
-	} else {
-		case $::operatingsystem {
-			debian: { # Entire stack from zenoss-dev repository
-				include zenoss::install::debian
-			}
-			default: { # Build from source
-				include zenoss::install::source
+class zenoss::install {
+		case $::osfamily {
+      # Only supports RHEL6 for the moment
+			RedHat: {
+				include zenoss::install::redhat	
 			}
 		}
 	}
