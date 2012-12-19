@@ -27,16 +27,20 @@ class zenoss::install::params {
 	$zenoss_version = '${zenoss_version_short}.0'
 	
 
+  $version_parts = split($::operatingsystemrelease, '.')
+  debug($version_parts)
+
 	case $::osfamily {
 		'redhat' : {
-			$package_platform = $::lsbmajdistrelease ? {
+			$package_platform = $version_parts[0] ? {
 				6 => 'el6',
-				5 => 'rhel5'
+				5 => 'rhel5',
+				undef => 'el6',
 			}
-
-			$zenoss_package_name = "zenoss-${zenoss_version}.${package_platform}.${::architecture}.rpm"
 		}
 	}
+
+	$zenoss_package_name = "zenoss-${zenoss_version}.${package_platform}.${::architecture}.rpm"
 
 	$zenoss_package_url = 'http://sourceforge.net/projects/zenoss/files/zenoss-${zenoss_version_short}/zenoss-${zenoss_version}/${zenoss_package_name}/download'
 
