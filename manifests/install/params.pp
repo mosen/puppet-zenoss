@@ -4,6 +4,13 @@ class zenoss::install::params {
 	# Open firewall ports associated with Zenoss Core, you will not be able to access the administrative interface if they are blocked.
 	$open_firewall = true
 
+  # You can enable or disable automatic installation of dependencies here
+  # Eg. if you have those dependencies declared somewhere else, you can set these to false.
+  $install_jre = true
+  $install_mysql = true
+  $install_rabbitmq = true
+
+
 	# Zenoss Core daemons will run as this user
 	$zenoss_user = 'zenoss'
 	$zenoss_password = 'zenoss'
@@ -20,19 +27,16 @@ class zenoss::install::params {
 
 	# MySQL Administrator (zenoss will use this to create new databases on startup check)
 	$zenoss_db_admin_user = 'root'
-	$zenoss_db_admin_password = ''
+	$zenoss_db_admin_password = 'zenoss'
 
-	# Package will be fetched from this location
+	# Package will be fetched based on this info
 	$zenoss_version_short = '4.2'
 	$zenoss_version = '${zenoss_version_short}.0'
-	
 
-  $version_parts = split($::operatingsystemrelease, '.')
-  debug($version_parts)
 
 	case $::osfamily {
 		'redhat' : {
-			$package_platform = $version_parts[0] ? {
+			$package_platform = $::os_major_version ? {
 				6 => 'el6',
 				5 => 'rhel5',
 				undef => 'el6',

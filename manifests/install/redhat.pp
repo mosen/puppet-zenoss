@@ -60,17 +60,9 @@ class zenoss::install::redhat (
   include zenoss::install::deps::jdk
 
   # Open up firewall ports for Zenoss and related services
-  include zenoss::install::firewall
-
-	## Step One : Package Conflicts
-	## Remove conflicting packages
-
-
-
-
-
-
-
+  if ($open_firewall) {
+    include zenoss::install::firewall
+  }
 
 	## Step Two: Prerequisite package and service installation
 

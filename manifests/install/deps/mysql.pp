@@ -18,7 +18,7 @@ class zenoss::install::deps::mysql (
 
     class { 'mysql::server':
       config_hash => { 'root_password' => $mysql_root_password },
-      require     => Yumrepo['remi'],
+      require     => Yumrepo['remi'], # Using the remi repo ensures that v5.5 is installed instead of v5.1
     }
 
   }
