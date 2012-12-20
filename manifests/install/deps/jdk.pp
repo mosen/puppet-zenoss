@@ -27,15 +27,18 @@ class zenoss::install::deps::jdk () {
 	}
 
 	#sudo wget -c --no-cookies --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F" "http://download.oracle.com/otn-pub/java/jdk/6u33-b04/jdk-6u33-linux-x64-rpm.bin" --output-document "/var/tmp/jdk-6u33-linux-x64-rpm.bin"
-
+  #http://download.oracle.com/otn-pub/java/jdk/6u38-b05/jre-6u38-linux-x64-rpm.bin
+  # unzip creates jre-6u38-linux-amd64.rpm
 
   # TODO: Make it work with other platforms.
+	$jdk_or_jre = "jre"
 	$jdk_package = "-rpm"
 
 	$jdk_url_root = "http://download.oracle.com/otn-pub/java/jdk"
-	$jdk_release = "6u33"
-	$jdk_release_dir = "6u33-b04"
-	$jdk_file = "jdk-$jdk_release-$jdk_platform-$jdk_architecture$jdk_package$jdk_suffix"
+	$jdk_release = "6u38"
+	$jdk_release_dir = "6u38-b05"
+	$jdk_file = "$jdk_or_jre-$jdk_release-$jdk_platform-$jdk_architecture$jdk_package$jdk_suffix"
+	$jdk_file_extracted = "$jdk_or_jre-$jdk_release-$jdk_platform-amd64.rpm"
 
 	$jdk_url = "http://download.oracle.com/otn-pub/java/jdk/$jdk_release_dir/$jdk_file"
 
@@ -52,7 +55,8 @@ class zenoss::install::deps::jdk () {
 
 	exec { "extract-jdk":
 	  command => "/usr/bin/unzip -o /var/tmp/$jdk_file -d /var/tmp/jdk_extracted",
-	  creates => "/var/tmp/jdk_extracted/jdk-6u33-linux-amd64.rpm",
+	  creates => "/var/tmp/jdk_extracted/$jdk_file_extracted", # TODO downloaded file is x64, extracted is amd64
+	  returns => [ 0, 1 ], # Will return 1 if the file header is not actually ZIP content (which it isnt, but works anyway).
 	  require => [ Package["unzip"], Exec["download-jdk"] ],
 	}
 
@@ -62,9 +66,9 @@ class zenoss::install::deps::jdk () {
 	#  unless => "/bin/rpm -q jdk"
 	#}
 
-	package { "jdk":
+	package { "$jdk_or_jre":
 	  ensure   => installed,
-	  source   => "/var/tmp/jdk_extracted/$jdk_file",
+	  source   => "/var/tmp/jdk_extracted/$jdk_file_extracted",
 	  provider => rpm,
 	  require  => Exec[ "extract-jdk" ],
 	}

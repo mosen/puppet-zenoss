@@ -38,14 +38,22 @@ class zenoss::install::redhat (
   # REPOFORGE provides rrdtool >= 1.7.4
   include repoforge
 
+  # Les RPMS de Remi provides MySQL >= 5.5
+  include zenoss::install::deps::repo_remi
+
   # zeneventhub(?) >= 4.0 now requires RabbitMQ
   include zenoss::install::deps::rabbitmq
 
   # zodb uses mysql::server and prefers version >= 5.5
-  include zenoss::install::deps::mysql
+  class { 'zenoss::install::deps::mysql':
+    require => Class['zenoss::install::deps::repo_remi'],
+  }
 
   # Zenoss Core 4 Requires various nagios plugins
-  include zenoss::install::deps::nagios-plugins
+  class { 'zenoss::install::deps::nagios-plugins':
+    require => Class['epel'],
+  }
+
 
 
   # Zenoss Core 4 Requires Oracle JRE for some reason
@@ -60,68 +68,9 @@ class zenoss::install::redhat (
 
 
 
-	# Zenoss Core Recommends removing matahari to use RabbitMQ
-	# TODO : Stop matahari first
 
-	package { "matahari-network":
-		ensure => absent,
-	}
 
-	package { "matahari-broker":
-		ensure  => absent,
-	}
 
-	package { "matahari-service":
-		ensure => absent,
-	}
-
-	package { "matahari-lib":
-		ensure => absent,
-		require => Package["matahari-agent-lib", "matahari-sysconfig", "matahari-network"],
-	}
-
-	package { "matahari-host":
-		ensure => absent,
-	}
-
-	package { "matahari-sysconfig":
-		ensure => absent,
-	}
-
-	package { "matahari":
-		ensure => absent,
-	}
-
-	package { "matahari-agent-lib":
-		ensure => absent,
-	}
-
-	# Zenoss Core Recommends removing qpid to use RabbitMQ
-	# TODO : Stop qpid first
-
-	package { "qpid-cpp-client-ssl":
-		ensure => absent,
-		require => Package["qpid-qmf"],
-	}
-
-	package { "qpid-qmf":
-		ensure => absent,
-	}
-
-	package { "qpid-cpp-client":
-		ensure => absent,
-		require => Package["qpid-cpp-client-ssl", "qpid-qmf", "qpid-cpp-server"],
-	}
-
-	package { "qpid-cpp-server":
-		ensure => absent,
-		require => Package["qpid-cpp-server-ssl"],
-	}
-
-	package { "qpid-cpp-server-ssl":
-		ensure => absent,
-		require => Package["matahari-broker"],
-	}
 
 	## Step Two: Prerequisite package and service installation
 
@@ -195,6 +144,7 @@ class zenoss::install::redhat (
 
 	# Zenoss Core Requires rrdtool >= 1.7.4 which is currently only available from repoforge/rpmforge-extras
 	# Only older versions are available on the base repo.
+  # The repoforge module does not enable rpmforge-extras by default.
 
 	package { "rrdtool":
 		ensure  => latest, # Should be at least 1.7.4
@@ -234,15 +184,16 @@ class zenoss::install::redhat (
 
 	$zenoss_pkg_url = "http://sourceforge.net/projects/zenoss/files/zenoss-4.2/zenoss-4.2.0/zenoss-4.2.0.el6.x86_64.rpm/download"
 
-	#exec { "download-zenoss-core-4":
-	#	command => "/usr/bin/wget -O /var/tmp/zenoss-4.2.0.rpm $zenoss_url",
-	#	creates => "/var/tmp/zenoss-4.2.0.rpm",
-	#}
+  # Added this because testing was taking an unreasonable amount of time when downloading zenoss repeatedly.
+	exec { "download-zenoss-core-4":
+		command => "/usr/bin/wget -O /var/tmp/zenoss-4.2.0.rpm $zenoss_pkg_url",
+		creates => "/var/tmp/zenoss-4.2.0.rpm",
+	}
 
 	package { "zenoss":
 		ensure   => installed,
-		source   => $zenoss_pkg_url,
-		require  =>
+		source   => "/var/tmp/zenoss-4.2.0.rpm",
+		require  => [
 		  Package[
 				"liberation-fonts-common",
 				"liberation-mono-fonts",
@@ -255,9 +206,10 @@ class zenoss::install::redhat (
 				"pkgconfig",
 				"dmidecode",
         "libxslt",
-        "sysstat",
-        "jdk"
-			],
+        "sysstat"
+	    ],
+	    Exec[ 'download-zenoss-core-4' ]
+	  ],
 		provider => rpm,
 	}
 

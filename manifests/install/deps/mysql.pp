@@ -1,6 +1,9 @@
 # Zenoss Core 4.2 Requires MySQL >= 5.5.13
+# EPEL and RPMforge do not carry MySQL >= 5.1, I use Les RPMS de Remi
+# MariaDB 5.5 may be an option
+
 class zenoss::install::deps::mysql (
-  # Sometimes MySQL will be installed by a different Resource, so there is the option to simply configure the Zenoss parts
+  # Pretty often you will have MySQL defined elsewhere, so there is the option to omit that installation if $install == false
   $install = true,
   $mysql_root_password = 'zenoss',
 
@@ -12,11 +15,12 @@ class zenoss::install::deps::mysql (
 ){
 
   if ($install) {
+
     class { 'mysql::server':
-      config_hash => { 'root_password' => $mysql_root_password }
+      config_hash => { 'root_password' => $mysql_root_password },
+      require     => Yumrepo['remi'],
     }
 
-    #class { 'mysql::client': }
   }
 
   Database {
