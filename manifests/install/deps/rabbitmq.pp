@@ -81,7 +81,7 @@ class zenoss::install::deps::rabbitmq {
  	package { "rabbitmq-server":
  	  ensure   => "3.0.1-1",
  	  source   => "http://www.rabbitmq.com/releases/rabbitmq-server/v3.0.1/rabbitmq-server-3.0.1-1.noarch.rpm",
- 	  #provider => rpm,
+ 	  provider => rpm,
  	}
 
  	service { "rabbitmq-server":

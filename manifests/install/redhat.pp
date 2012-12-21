@@ -1,14 +1,9 @@
 # Install Zenoss Core 4 on a RHEL/CentOS Node
 # Some steps must still be performed manually, but will be automated in the near future.
 
-#	jre >= 1.6.0 is needed by zenoss-4.2.0-1586.el6.x86_64
-#	libmysqlclient.so.18()(64bit) is needed by zenoss-4.2.0-1586.el6.x86_64
-#	mysql-server >= 5.5.13 is needed by zenoss-4.2.0-1586.el6.x86_64
+#error: Failed dependencies:
 #	mysql-shared >= 5.5.13 is needed by zenoss-4.2.0-1586.el6.x86_64
-
-# Can't find rabbitmq-server >= 2.8.4 in any repo?!?
-#	rabbitmq-server >= 2.8.4 is needed by zenoss-4.2.0-1586.el6.x86_64
-#
+#	rrdtool >= 1.4.7 is needed by zenoss-4.2.0-1586.el6.x86_64
 
 class zenoss::install::redhat (
 
@@ -32,31 +27,29 @@ class zenoss::install::redhat (
 
 	# DEPENDENCIES
 
-  # EPEL provides rabbitmq WRONG VERSION, nagios-plugins-*
+  # EPEL provides nagios-plugins-*
   include epel
 
-  # REPOFORGE provides rrdtool >= 1.7.4
+  # REPOFORGE (rpmforge-extras) provides rrdtool >= 1.7.4
   include repoforge
 
-  # Les RPMS de Remi provides MySQL >= 5.5
+  # Les RPMS de Remi provides MySQL >= 5.5 except mysql-shared package.
   include zenoss::install::deps::repo_remi
 
-  # zeneventhub(?) >= 4.0 now requires RabbitMQ
+  # Zenoss 4.2 Requires RabbitMQ
   include zenoss::install::deps::rabbitmq
 
-  # zodb uses mysql::server and prefers version >= 5.5
+  # Zenoss 4.2 Requires MySQL >= 5.5.13
   class { 'zenoss::install::deps::mysql':
     require => Class['zenoss::install::deps::repo_remi'],
   }
 
-  # Zenoss Core 4 Requires various nagios plugins
+  # Zenoss 4.2 Requires some core nagios plugins
   class { 'zenoss::install::deps::nagios-plugins':
     require => Class['epel'],
   }
 
-
-
-  # Zenoss Core 4 Requires Oracle JRE for some reason
+  # Zenoss 4.2 Explicitly states that only Oracle JRE may be used
   include zenoss::install::deps::jdk
 
   # Open up firewall ports for Zenoss and related services
@@ -200,37 +193,15 @@ class zenoss::install::redhat (
         "libxslt",
         "sysstat"
 	    ],
-	    Exec[ 'download-zenoss-core-4' ]
+	    Exec[ 'download-zenoss-core-4' ],
+	    Database[
+        "zodb",
+        "zodb_session",
+        "zenoss_zep"
+      ]
 	  ],
 		provider => rpm,
 	}
-
-	#	package { "zenoss":
-  #		ensure   => installed,
-  #		source   => $zenoss_pkg_url,
-  #		require  => [
-  #		  Package[
-  #				"liberation-fonts-common",
-  #				"liberation-mono-fonts",
-  #				"liberation-sans-fonts",
-  #				"liberation-serif-fonts",
-  #				"libgcj",
-  #				"nagios-plugins",
-  #				"net-snmp-utils",
-  #				"rrdtool",
-  #				"pkgconfig",
-  #				"dmidecode",
-  #        "libxslt",
-  #        "jdk"
-  #			],
-  #			Database[
-  #			  "zodb",
-  #			  "zodb_session",
-  #			  "zenoss_zep"
-  #			]
-  #		],
-  #		provider => rpm,
-  #	}
 
 	file { "/opt/zenoss/etc/global.conf":
 		ensure  => present,
@@ -246,8 +217,8 @@ class zenoss::install::redhat (
 	$zenpacks_url = "http://sourceforge.net/projects/zenoss/files/zenpacks-4.2/zenpacks-4.2.0/zenoss-core-zenpacks-4.2.0.el6.x86_64.rpm"
 
 	package { "zenoss-core-zenpacks":
-		ensure => installed,
-		source => $zenpacks_url,
+		ensure  => installed,
+		source  => $zenpacks_url,
 		require => Package["zenoss"],
 	}
 }
