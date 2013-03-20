@@ -1,5 +1,5 @@
 # Open firewall ports for Zenoss Core 4 Services
-class zenoss::install::firewall {
+class zenoss::firewall {
 
 	# Open firewall ports for Zenoss Core 4
 	# Depends on: puppetlabs-firewall

@@ -8,22 +8,45 @@
 class zenoss::install::redhat (
 
 	# Open firewall ports associated with Zenoss Core, you will not be able to access the administrative interface if they are blocked.
-	$open_firewall = $zenoss::install::params::open_firewall,
+	$open_firewall = $zenoss::params::open_firewall,
+
+  # You can enable or disable automatic installation of dependencies here
+  # Eg. if you have those dependencies declared somewhere else, you can set these to false.
+  $install_jre = $zenoss::params::install_jre,
+  $install_mysql = $zenoss::params::install_mysql,
+  $install_rabbitmq = $zenoss::params::install_rabbitmq,
 
 	# Zenoss Core daemons will run as this user
-	$zenoss_user = $zenoss::install::params::zenoss_user,
-	$zenoss_password = $zenoss::install::params::zenoss_password,
+	$zenoss_user = $zenoss::params::zenoss_user,
+	$zenoss_password = $zenoss::params::zenoss_password,
 
 	# Zenoss Core Web Application Data
-	$zenoss_db_host = $zenoss::install::params::zenoss_db_host,
-	$zenoss_db_user = $zenoss::install::params::zenoss_db_user,
-	$zenoss_db_password = $zenoss::install::params::zenoss_db_password,
+	$zenoss_db_host = $zenoss::params::zenoss_db_host,
+	$zenoss_db_user = $zenoss::params::zenoss_db_user,
+	$zenoss_db_password = $zenoss::params::zenoss_db_password,
+
+	# Zenoss Core Event Server Data
+	$zenoss_event_db_host = $zenoss::params::zenoss_event_db_host,
+	$zenoss_event_db_user = $zenoss::params::zenoss_event_db_user, # cannot be identical to the zenoss_db_user parameter
+	$zenoss_event_db_password = $zenoss::params::zenoss_event_db_password,
+
+  # Zenoss RabbitMQ User
+  $zenoss_mq_user = $zenoss::params::zenoss_mq_user,
+  $zenoss_mq_password = $zenoss::params::zenoss_mq_password,
 
 	# MySQL Administrator (zenoss will use this to create new databases on startup check)
-	$zenoss_db_admin_user = $zenoss::install::params::zenoss_db_admin_user,
-	$zenoss_db_admin_password = $zenoss::install::params::zenoss_db_admin_password
+	$zenoss_db_admin_user = $zenoss::params::zenoss_db_admin_user,
+	$zenoss_db_admin_password = $zenoss::params::zenoss_db_admin_password,
 
-	) inherits zenoss::install::params {
+  # These components make up the package url
+	$zenoss_version_short = $zenoss::params::zenoss_version_short,
+	$zenoss_version = $zenoss::params::zenoss_version,
+	$zenoss_package_name = $zenoss::params::zenoss_package_name,
+
+	# Package will be fetched from this location
+	$zenoss_package_url = $zenoss::params::zenoss_package_url
+
+	) inherits zenoss::params {
 
 	# DEPENDENCIES
 
@@ -34,6 +57,7 @@ class zenoss::install::redhat (
   include repoforge
 
   # Les RPMS de Remi provides MySQL >= 5.5 except mysql-shared package.
+  # TODO: Consider using percona or mariadb instead.
   include zenoss::install::deps::repo_remi
 
   # Zenoss 4.2 Requires RabbitMQ
@@ -52,20 +76,15 @@ class zenoss::install::redhat (
   # Zenoss 4.2 Explicitly states that only Oracle JRE may be used
   include zenoss::install::deps::jdk
 
-  # Open up firewall ports for Zenoss and related services
-  if ($open_firewall) {
-    include zenoss::install::firewall
-  }
-
 	## Step Two: Prerequisite package and service installation
 
 	# Zenoss Core Requires memcached
     
-    package { "memcached":
+  package { "memcached":
     	ensure => installed,
 	}
 
-    service { "memcached":
+  service { "memcached":
     	ensure => running,
     	require => Package["memcached"],
 	}
@@ -84,10 +103,6 @@ class zenoss::install::redhat (
 		ensure => running,
 		require => Package["net-snmp"],
 	}
-
-
-
-
 
 	# Misc other requirements
 
@@ -137,47 +152,17 @@ class zenoss::install::redhat (
 		# enablerepo rpmforge-extras
 	}
 
-
-
-
-	# Create the user that zenoss daemons will run as
-
-	user { $zenoss_user:
-		ensure => present,
-	}
-
-	file { "/home/${zenoss_user}":
-		ensure  => directory,
-		owner   => $zenoss_user,
-		mode    => 0755,
-		require => User[$zenoss_user],
-	}
-
-	file { "/home/${zenoss_user}/.bash_profile":
-		ensure => present,
-		owner  => $zenoss_user,
-		mode   => 0644,
-		require => File["/home/${zenoss_user}"],
-		content => template('zenoss/zenoss_bash_profile.erb'),
-	}
-
-
-
-
-
 	# Install Zenoss Core 4
 
-	$zenoss_pkg_url = "http://sourceforge.net/projects/zenoss/files/zenoss-4.2/zenoss-4.2.0/zenoss-4.2.0.el6.x86_64.rpm/download"
-
-  # Added this because testing was taking an unreasonable amount of time when downloading zenoss repeatedly.
-	exec { "download-zenoss-core-4":
-		command => "/usr/bin/wget -O /var/tmp/zenoss-4.2.0.rpm $zenoss_pkg_url",
-		creates => "/var/tmp/zenoss-4.2.0.rpm",
+  # I added this as an exec because using a yum/rpm http source was taking a huge amount of time during testing.
+	exec { "download-zenoss-core":
+		command => "/usr/bin/wget -O /var/tmp/zenoss.rpm $zenoss_package_url",
+		creates => "/var/tmp/zenoss.rpm",
 	}
 
 	package { "zenoss":
 		ensure   => installed,
-		source   => "/var/tmp/zenoss-4.2.0.rpm",
+		source   => "/var/tmp/zenoss.rpm",
 		require  => [
 		  Package[
 				"liberation-fonts-common",
@@ -193,32 +178,23 @@ class zenoss::install::redhat (
         "libxslt",
         "sysstat"
 	    ],
-	    Exec[ 'download-zenoss-core-4' ],
+	    Exec[ 'download-zenoss-core' ],
 	    Database[
         "zodb",
         "zodb_session",
         "zenoss_zep"
       ]
 	  ],
-		provider => rpm,
+		provider => rpm, # TODO: yum should probably be used instead to perform proper package upgrades
 	}
 
-	file { "/opt/zenoss/etc/global.conf":
-		ensure  => present,
-		content => template('zenoss/global.conf.erb'),
-		require => Package["zenoss"],
-	}
 
-	service { "zenoss":
-		ensure  => running,
-		require => [ Package["zenoss"], File["/opt/zenoss/etc/global.conf"] ],
-	}
-
-	$zenpacks_url = "http://sourceforge.net/projects/zenoss/files/zenpacks-4.2/zenpacks-4.2.0/zenoss-core-zenpacks-4.2.0.el6.x86_64.rpm"
-
-	package { "zenoss-core-zenpacks":
-		ensure  => installed,
-		source  => $zenpacks_url,
-		require => Package["zenoss"],
-	}
+  # Zenoss Core 4.2.3 states that zenpacks are now integrated into the rpm
+#	$zenpacks_url = "http://sourceforge.net/projects/zenoss/files/zenpacks-4.2/zenpacks-4.2.0/zenoss-core-zenpacks-4.2.0.el6.x86_64.rpm"
+#
+#	package { "zenoss-core-zenpacks":
+#		ensure  => installed,
+#		source  => $zenpacks_url,
+#		require => Package["zenoss"],
+#	}
 }

@@ -4,7 +4,7 @@
 
 class zenoss::install {
   case $::osfamily {
-    # Only supports RHEL6 for the moment
+    # Only supports RHEL6 for the moment, because that is my testing platform.
     RedHat: {
       include zenoss::install::redhat
     }

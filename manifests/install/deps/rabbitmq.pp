@@ -84,11 +84,6 @@ class zenoss::install::deps::rabbitmq {
  	  provider => rpm,
  	}
 
- 	service { "rabbitmq-server":
- 	  ensure  => running,
- 	  require => Package["rabbitmq-server"],
- 	}
-
   # RabbitMQ fails to start on my vagrant guest when DNS does not resolve the local hostname
 
   #class { 'rabbitmq::server':
@@ -97,29 +92,5 @@ class zenoss::install::deps::rabbitmq {
   #  require           => Package["rabbitmq-server"], # Use our manual package installation instead of the Repo copy
   #}
 
-  # Configure the RabbitMQ instance
 
-  $zenoss_mq_user = 'zenoss'
-  $zenoss_mq_password = 'zenoss'
-
-  rabbitmq_user { $zenoss_mq_user:
-    admin    => true,
-    password => $zenoss_mq_password,
-    provider => 'rabbitmqctl',
-    require  => Service["rabbitmq-server"],
-  }
-
-  rabbitmq_vhost { "zenoss":
-    ensure   => present,
-    require  => Service["rabbitmq-server"],
-    provider => 'rabbitmqctl',
-  }
-
-  rabbitmq_user_permissions { "${zenoss_mq_user}@zenoss":
-    configure_permission => '.*',
-    read_permission      => '.*',
-    write_permission     => '.*',
-    require              => Service["rabbitmq-server"],
-    provider 			       => 'rabbitmqctl',
-  }
 }
